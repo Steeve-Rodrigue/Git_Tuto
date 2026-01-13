@@ -115,3 +115,8 @@ Run your Git command again (e.g. git pull or git push) while still in your proje
 
 All done! Your computer can now securely push and pull code from GitHub over SSH.
 Happy coding! 
+
+
+
+Reset a branch to an initial commit
+git checkout --orphan temp-branch && git add . && git commit -m "Initial commit" && git branch -D main && git branch -m main && git push origin main --force  
