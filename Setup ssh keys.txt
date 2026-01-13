@@ -1,0 +1,117 @@
+Setting Up SSH Keys for GitHub
+
+Generate your SSH key
+Start the SSH agent & add your key
+Copy your public key
+Add the key to your GitHub account
+Test your SSH connection
+
+
+
+1. Generate your SSH key
+What it means: We’re creating a secret key pair on your computer so GitHub can trust it.
+
+macOS / Linux
+
+Open Terminal.
+Run:
+ ssh-keygen -t ed25519 -C "your_email@example.com"
+Press Enter to accept the default file location.
+Enter a passphrase or press Enter twice to skip.
+
+Windows
+Open PowerShell or Git Bash.
+Run:
+ ssh-keygen -t ed25519 -C "your_email@example.com"
+Press Enter to accept defaults.
+Enter a passphrase or press Enter twice to skip.
+
+Tip: Use the same email you use on GitHub.
+
+
+
+
+2. Start the SSH agent & add your key
+What it means: We’re running a helper program that holds your secret key while you work.
+
+macOS / Linux
+In Terminal, run:
+ eval "$(ssh-agent -s)"
+Then run:
+ ssh-add ~/.ssh/id_ed25519
+
+Windows
+In PowerShell or Git Bash, run:
+ eval "$(ssh-agent -s)"
+Then run:
+ ssh-add /c/Users/you/.ssh/id_ed25519 or ssh-add %USERPROFILE%\.ssh\id_ed25519 or ssh-add $HOME\.ssh\id_ed25519
+
+
+3. Copy your public key
+What it means: We’re grabbing the “lock” part of your key pair to give to GitHub.
+
+macOS
+ pbcopy < ~/.ssh/id_ed25519.pub
+
+Linux
+ xclip -sel clip < ~/.ssh/id_ed25519.pub
+ (Install xclip via sudo apt install xclip if needed.)
+
+Windows
+ clip < ~/.ssh/id_ed25519.pub
+
+Or (any OS)
+ Run cat ~/.ssh/id_ed25519.pub and manually select and copy the entire key.
+
+
+
+4. Add the key to your GitHub account
+What it means: We’re telling GitHub “this key belongs to me” so it will let you in.
+Log in at github.com.
+Click your avatar → Settings → SSH and GPG keys.
+Click New SSH key.
+In Title, type something like “My Laptop Key.”
+Paste your public key into the Key box.
+Click Add SSH key (enter your GitHub password if asked).
+
+
+
+5. Test your SSH connection
+What it means: We’re checking that GitHub recognizes your key and lets you connect.
+macOS / Linux / Windows
+ Run:
+ ssh -T git@github.com
+
+You should see:
+Hi your_username! You've successfully authenticated, but GitHub does not provide shell access.
+
+6. Troubleshooting: Re-add your SSH key (only if needed)
+What it means: If GitHub later says “permission denied” or “repository not found,” your SSH agent may have forgotten your key. This brings it back.
+Open Terminal / PowerShell and go to your project folder:
+
+macOS/Linux:
+cd ~/path/to/my-react-app
+
+Windows:
+cd C:\Users\you\Documents\my-react-app
+Find your SSH key file name:
+macOS/Linux:
+ls ~/.ssh
+Windows (PowerShell):
+
+ls $HOME\.ssh
+Look for id_ed25519 (private) and id_ed25519.pub (public).
+
+
+Re-add your key to the agent:
+macOS/Linux:
+
+ssh-add ~/.ssh/id_ed25519
+Windows:
+
+ssh-add /c/Users/you/.ssh/id_ed25519
+Run your Git command again (e.g. git pull or git push) while still in your project folder.
+
+
+All done! Your computer can now securely push and pull code from GitHub over SSH.
+Happy coding! 
