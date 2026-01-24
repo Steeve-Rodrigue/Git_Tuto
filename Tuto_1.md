@@ -109,7 +109,7 @@ fi
 
 Before using hooks, configure Ruff (Python linter/formatter).
 
-### Create pyproject.toml
+### Add this to your pyproject.toml file
 ```toml
 # pyproject.toml
 
