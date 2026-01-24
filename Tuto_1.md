@@ -5,396 +5,177 @@
 1. [Introduction to Git Hooks](#introduction-to-git-hooks)
 2. [Understanding Git Hooks](#understanding-git-hooks)
 3. [Available Git Hooks](#available-git-hooks)
-4. [Configuring Linters and Formatters](#configuring-linters-and-formatters)
+4. [Configuring Ruff](#configuring-ruff)
 
 ---
 
 ## Introduction to Git Hooks
 
-Git hooks are scripts that Git executes automatically before or after events such as commit, push, and receive.
+Git hooks are scripts that run automatically before or after Git events (commit, push, etc.).
 
-### Key Benefits
+### Why Use Hooks?
 
-- **Automate tasks**: Linting, formatting, testing
-- **Enforce standards**: Code style, commit message format
-- **Catch errors early**: Before code enters the repository
-- **Improve workflow**: Reduce CI/CD failures
+- Automate linting and formatting
+- Enforce code standards
+- Catch errors before commit
+- Reduce CI/CD failures
 
-### Example Impact
-
-**Without hooks:**
+**Example:**
 ```bash
+# Without hooks
 $ git commit -m "Add feature"
 [main abc1234] Add feature
+# CI fails later ❌
 
-# Later in CI...
-❌ Build failed: Linting errors
-```
-
-**With hooks:**
-```bash
+# With hooks
 $ git commit -m "Add feature"
-Running pre-commit checks...
 ❌ Linting failed. Commit blocked.
-Fix errors and try again.
 ```
 
 ---
 
 ## Understanding Git Hooks
 
-### Location and Structure
+### Location
 
-Hooks are stored in `.git/hooks/` directory:
+Hooks live in `.git/hooks/`:
 ```bash
 $ ls .git/hooks/
 pre-commit.sample
 commit-msg.sample
 pre-push.sample
-# ... other samples
 ```
 
-### Key Characteristics
+### Key Points
 
-1. **Not version controlled** - Located in `.git/` directory
-2. **Must be executable** - Requires `chmod +x`
-3. **Language agnostic** - Bash, Python, Ruby, etc.
-4. **Exit codes matter**:
-   - `exit 0` = Success (allow action)
-   - `exit 1` = Failure (block action)
+1. **Not version controlled** - In `.git/` directory
+2. **Must be executable** - Use `chmod +x`
+3. **Exit codes**:
+   - `exit 0` = Allow action
+   - `exit 1` = Block action
 
-### Basic Hook Structure
+### Basic Hook
 ```bash
 #!/bin/bash
 # .git/hooks/pre-commit
 
-set -e  # Exit on error
-
 echo "Running checks..."
-
-# Your validation logic here
-
-exit 0  # Success
+# Your checks here
+exit 0
 ```
 
-### Making a Hook Executable
+### Make Executable
 ```bash
-# Create hook
-$ touch .git/hooks/pre-commit
-
-# Make executable (required!)
-$ chmod +x .git/hooks/pre-commit
-
-# Verify
-$ ls -l .git/hooks/pre-commit
--rwxr-xr-x  1 user  staff  256 Jan 24 10:00 .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
 ```
 
-### Bypassing Hooks
+### Bypass Hooks
 ```bash
-# Skip hooks when needed
-$ git commit --no-verify -m "Emergency fix"
-$ git push --no-verify
+git commit --no-verify -m "Skip hooks"
 ```
 
 ---
 
 ## Available Git Hooks
 
-### Client-Side Hooks (Local Machine)
+### Main Client-Side Hooks
 
-#### **pre-commit**
-- **When**: Before commit message editor opens
-- **Use**: Linting, formatting, syntax checking
-- **Bypass**: `git commit --no-verify`
+| Hook | When | Use For |
+|------|------|---------|
+| `pre-commit` | Before commit | Linting, formatting |
+| `commit-msg` | After message entered | Validate message format |
+| `pre-push` | Before push | Run tests |
+| `post-commit` | After commit | Notifications |
 
-#### **prepare-commit-msg**
-- **When**: After default message created, before editor
-- **Use**: Auto-populate commit templates
-- **Parameters**: Message file path, commit type, SHA
+### Common Patterns
 
-#### **commit-msg**
-- **When**: After commit message entered
-- **Use**: Validate commit message format
-- **Parameters**: Path to commit message file
-
-#### **post-commit**
-- **When**: After commit completed
-- **Use**: Notifications, logging
-- **Cannot block**: Commit already made
-
-#### **pre-rebase**
-- **When**: Before rebase operation
-- **Use**: Prevent rebasing published commits
-
-#### **post-checkout**
-- **When**: After `git checkout`
-- **Use**: Update working directory, clear artifacts
-
-#### **post-merge**
-- **When**: After successful merge
-- **Use**: Restore state, update dependencies
-
-#### **pre-push**
-- **When**: Before push to remote
-- **Use**: Run tests, verify no secrets
-- **Bypass**: `git push --no-verify`
-
-### Server-Side Hooks (Git Server)
-
-#### **pre-receive**
-- **When**: Before any refs updated on remote
-- **Use**: Enforce policies, reject pushes
-
-#### **update**
-- **When**: Once per branch being pushed
-- **Use**: Branch-specific rules
-
-#### **post-receive**
-- **When**: After all refs updated
-- **Use**: Trigger CI/CD, send notifications
-
-### Hook Execution Flow
-```
-git commit
-    ↓
-pre-commit exists?
-    ↓
-Execute pre-commit
-    ↓
-exit 0? → Continue commit
-exit 1? → Block commit
-```
-
-### Common Hook Patterns
-
-#### Get Staged Files
+**Get staged Python files:**
 ```bash
-# All staged files
-git diff --cached --name-only --diff-filter=d
-
-# Staged Python files only
 git diff --cached --name-only --diff-filter=d | grep '\.py$'
 ```
 
-#### Check Exit Status
+**Check command result:**
 ```bash
 command_to_run
-
 if [ $? -ne 0 ]; then
-    echo "❌ Command failed"
+    echo "❌ Failed"
     exit 1
 fi
 ```
 
-#### Environment Variables
-```bash
-echo "Git dir: $GIT_DIR"
-echo "Author: $GIT_AUTHOR_NAME"
-echo "Editor: $GIT_EDITOR"
-```
-
 ---
 
-## Configuring Linters and Formatters
+## Configuring Ruff
 
-Before using hooks, you need to configure the tools they will run. Most linters and formatters use configuration files to define rules.
+Before using hooks, configure Ruff (Python linter/formatter).
 
-### Ruff Configuration
-
-Ruff is a fast Python linter and formatter. It can be configured using either `pyproject.toml` or `ruff.toml`.
-
-#### Option 1: Using pyproject.toml (Recommended)
+### Create pyproject.toml
 ```toml
 # pyproject.toml
 
-[project]
-name = "my-project"
-version = "1.0.0"
-
 [tool.ruff]
-# Line length
 line-length = 88
-
-# Python version
-target-version = "py311"
-
-# Enable specific rules
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-]
-
-# Ignore specific rules
-ignore = [
-    "E501",  # Line too long (handled by formatter)
-]
-
-# Exclude directories
-exclude = [
-    ".git",
-    "__pycache__",
-    ".venv",
-    "build",
-    "dist",
-]
-
-[tool.ruff.format]
-# Use single quotes
-quote-style = "single"
-
-# Indent with spaces
-indent-style = "space"
-
-[tool.ruff.lint.isort]
-# Import sorting
-known-first-party = ["my_project"]
-```
-
-#### Option 2: Using ruff.toml
-```toml
-# ruff.toml
-
-# Line length
-line-length = 88
-
-# Python version
 target-version = "py311"
 
 # Enable rules
 select = [
     "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
     "F",   # pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
+    "I",   # isort (imports)
 ]
 
 # Ignore rules
-ignore = ["E501"]
+ignore = ["E501"]  # Line too long
 
-# Exclude paths
-exclude = [
-    ".git",
-    "__pycache__",
-    ".venv",
-]
+# Exclude directories
+exclude = [".git", "__pycache__", ".venv"]
 
-[format]
+[tool.ruff.format]
 quote-style = "single"
-indent-style = "space"
-
-[lint.isort]
-known-first-party = ["my_project"]
 ```
 
-### Common Ruff Rules
+### Common Rules
 
-| Rule Code | Description | Example |
-|-----------|-------------|---------|
-| `E` | pycodestyle errors | Indentation, whitespace |
-| `W` | pycodestyle warnings | Deprecated features |
-| `F` | pyflakes | Unused imports, variables |
-| `I` | isort | Import sorting |
-| `N` | pep8-naming | Naming conventions |
-| `UP` | pyupgrade | Modern Python syntax |
-| `B` | flake8-bugbear | Common bugs |
-| `C90` | mccabe | Complexity checking |
+- `E` - Style errors (indentation, whitespace)
+- `F` - Code errors (unused imports, undefined names)
+- `I` - Import sorting
+- `N` - Naming conventions
+- `B` - Common bugs
 
-### Testing Your Configuration
+### Test Configuration
 ```bash
-# Check files with Ruff
+# Check files
 ruff check .
 
-# Format files with Ruff
+# Format files
 ruff format .
-
-# Check specific file
-ruff check src/main.py
-
-# Show what would be fixed
-ruff check --diff .
 
 # Auto-fix issues
 ruff check --fix .
 ```
 
-### Other Common Configurations
-
-#### Black (Code Formatter)
+### Alternative: ruff.toml
 ```toml
-# pyproject.toml
+# ruff.toml (alternative to pyproject.toml)
 
-[tool.black]
 line-length = 88
-target-version = ['py311']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | build
-  | dist
-)/
-'''
+select = ["E", "F", "I"]
+ignore = ["E501"]
+exclude = [".git", ".venv"]
 ```
 
-#### Flake8 (Linter)
-```ini
-# .flake8
+**Recommendation**: Use `pyproject.toml` to keep all config in one file.
 
-[flake8]
-max-line-length = 88
-extend-ignore = E203, W503
-exclude = 
-    .git,
-    __pycache__,
-    .venv,
-    build,
-    dist
-```
-
-#### isort (Import Sorter)
-```toml
-# pyproject.toml
-
-[tool.isort]
-profile = "black"
-line_length = 88
-known_first_party = ["my_project"]
-```
-
-### Project Structure with Configuration
+### Project Structure
 ```
 my-project/
 ├── .git/
-├── pyproject.toml          # Ruff + project config
-├── .gitignore
-├── hooks/                  # Custom hook scripts (for later)
+├── pyproject.toml       # Ruff config
 ├── src/
-│   ├── __init__.py
 │   └── main.py
-├── tests/
-│   └── test_main.py
-└── README.md
+└── tests/
 ```
-
-### Configuration Priority
-
-Ruff looks for configuration in this order:
-
-1. `ruff.toml` in current directory
-2. `pyproject.toml` in current directory
-3. `ruff.toml` in parent directories
-4. `pyproject.toml` in parent directories
-
-**Recommendation**: Use `pyproject.toml` to centralize all Python tool configurations.
 
 ---
 
-**Next**: Part 2 will cover Method 1 (Local Git Hooks) with practical examples using these configurations.
+**Next**: Part 2 - Local Git Hooks with practical examples.
