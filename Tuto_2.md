@@ -3,81 +3,102 @@
 ## Table of Contents
 
 1. [Method 1: Local Git Hooks](#method-1-local-git-hooks)
+   - [Project Structure](#project-structure)
    - [Setup Process](#setup-process)
-   - [Basic Examples](#basic-examples)
-   - [Advanced Examples](#advanced-examples)
+   - [Examples](#examples)
    - [Limitations](#limitations)
 
 ---
 
 ## Method 1: Local Git Hooks
 
-Local Git hooks are scripts placed directly in `.git/hooks/` directory. This method gives full control but requires manual setup on each machine.
+Local hooks are scripts placed directly in `.git/hooks/` directory. Simple but not version controlled.
 
-### Setup Process
+---
 
-#### Step 1: Navigate to Hooks Directory
+## Project Structure
+```
+my-project/
+├── .git/
+│   └── hooks/
+│       ├── pre-commit          # Your hook script (executable)
+│       ├── commit-msg          # Message validation hook
+│       └── pre-push            # Push validation hook
+├── pyproject.toml              # Ruff config (from Part 1)
+├── src/
+│   ├── __init__.py
+│   └── main.py
+└── tests/
+    └── test_main.py
+```
+
+**Important**: Files in `.git/hooks/` are NOT tracked by Git!
+
+---
+
+## Setup Process
+
+### Step 1: Navigate to Hooks Directory
 ```bash
 cd /path/to/your/repository
 cd .git/hooks
 ```
 
-#### Step 2: Create Hook File
+### Step 2: Create Hook File
 ```bash
 # Create the hook
 touch pre-commit
 
-# Make it executable (critical!)
+# Make it executable (required!)
 chmod +x pre-commit
 ```
 
-#### Step 3: Write Your Script
+### Step 3: Edit the Hook
 
-Open the file and add your validation logic with the appropriate shebang.
+Open `.git/hooks/pre-commit` in your editor and add your script.
 
 ---
 
-### Basic Examples
+## Examples
 
-#### Example 1: Simple Bash Pre-commit Hook
+### Example 1: Simple Bash Hook
 ```bash
 #!/bin/bash
 # .git/hooks/pre-commit
 
 set -e
 
-echo "Running pre-commit checks..."
+echo "=== Pre-commit Checks ==="
 
-STAGED_PY=$(git diff --cached --name-only --diff-filter=d | grep '\.py$' || true)
+# Get staged Python files
+FILES=$(git diff --cached --name-only --diff-filter=d | grep '\.py$' || true)
 
-if [ -n "$STAGED_PY" ]; then
-    flake8 $STAGED_PY || {
-        echo "❌ Linting failed"
-        exit 1
-    }
+if [ -z "$FILES" ]; then
+    echo "No Python files staged"
+    exit 0
 fi
+
+# Run Ruff check
+ruff check $FILES || {
+    echo "❌ Ruff failed"
+    exit 1
+}
 
 echo "✅ Checks passed"
 exit 0
 ```
 
-**Output when failing:**
+**Usage:**
 ```bash
+$ git add src/main.py
 $ git commit -m "Add feature"
-Running pre-commit checks...
-file.py:5:1: F401 'os' imported but unused
-❌ Linting failed
-```
-
-**Output when passing:**
-```bash
-$ git commit -m "Add feature"
-Running pre-commit checks...
+=== Pre-commit Checks ===
+Running Ruff...
 ✅ Checks passed
 [main abc1234] Add feature
 ```
 
-#### Example 2: Python Pre-commit Hook
+### Example 2: Python Hook with Ruff Format + Check
 ```python
 #!/usr/bin/env python3
 # .git/hooks/pre-commit
@@ -85,329 +106,165 @@ Running pre-commit checks...
 import subprocess
 import sys
 
-print("Running pre-commit checks...")
+print("=== Pre-commit Checks ===")
 
 # Get staged Python files
 result = subprocess.run(
     ["git", "diff", "--cached", "--name-only", "--diff-filter=d"],
     capture_output=True, text=True
 )
-
 files = [f for f in result.stdout.splitlines() if f.endswith(".py")]
 
 if not files:
-    print("No Python files staged")
+    print("No Python files")
     sys.exit(0)
 
-# Run linter
-check = subprocess.run(["flake8"] + files, capture_output=True)
+# Format
+print("Formatting...")
+subprocess.run(["ruff", "format"] + files)
+
+# Check
+print("Checking...")
+check = subprocess.run(["ruff", "check"] + files)
 
 if check.returncode != 0:
-    print("❌ Linting failed:")
-    print(check.stdout.decode())
+    print("❌ Failed")
     sys.exit(1)
 
-print("✅ Checks passed")
+# Re-stage
+subprocess.run(["git", "add"] + files)
+
+print("✅ Passed")
 sys.exit(0)
 ```
 
-#### Example 3: Commit Message Validation
+**Make executable:**
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
+### Example 3: Commit Message Validation
 ```bash
 #!/bin/bash
 # .git/hooks/commit-msg
 
-COMMIT_MSG_FILE=$1
-COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+MSG_FILE=$1
+MSG=$(cat "$MSG_FILE")
 
-# Conventional commits pattern
+# Format: type(scope): description
 PATTERN="^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .+"
 
-if ! echo "$COMMIT_MSG" | grep -iqE "$PATTERN"; then
-    echo "❌ Invalid commit message format"
-    echo ""
-    echo "Format: <type>(<scope>): <description>"
-    echo "Example: feat(auth): add login feature"
+if ! echo "$MSG" | grep -iqE "$PATTERN"; then
+    echo "❌ Invalid format"
+    echo "Use: type(scope): description"
+    echo "Example: feat(auth): add login"
     exit 1
 fi
 
-echo "✅ Commit message valid"
+echo "✅ Valid"
 exit 0
 ```
 
-**Output:**
+**Make executable:**
+```bash
+chmod +x .git/hooks/commit-msg
+```
+
+**Usage:**
 ```bash
 $ git commit -m "added stuff"
-❌ Invalid commit message format
+❌ Invalid format
+Use: type(scope): description
 
-Format: <type>(<scope>): <description>
-Example: feat(auth): add login feature
-
-$ git commit -m "feat(auth): add login feature"
-✅ Commit message valid
-[main abc1234] feat(auth): add login feature
+$ git commit -m "feat(auth): add login"
+✅ Valid
+[main abc1234] feat(auth): add login
 ```
 
 ---
 
-### Advanced Examples
+## Quick Commands
 
-#### Multiple Checks in One Hook
+### Test Hook Manually
 ```bash
-#!/bin/bash
-# .git/hooks/pre-commit
+# Run the hook
+.git/hooks/pre-commit
 
-set -e
+# Check syntax (Bash)
+bash -n .git/hooks/pre-commit
 
-FAILED=0
-
-# Check 1: Python linting
-STAGED_PY=$(git diff --cached --name-only --diff-filter=d | grep '\.py$' || true)
-if [ -n "$STAGED_PY" ]; then
-    echo "Checking Python files..."
-    flake8 $STAGED_PY || FAILED=1
-fi
-
-# Check 2: JavaScript linting
-STAGED_JS=$(git diff --cached --name-only --diff-filter=d | grep '\.js$' || true)
-if [ -n "$STAGED_JS" ]; then
-    echo "Checking JavaScript files..."
-    eslint $STAGED_JS || FAILED=1
-fi
-
-# Check 3: Prevent direct commits to main
-BRANCH=$(git symbolic-ref --short HEAD)
-if [ "$BRANCH" = "main" ]; then
-    echo "❌ Direct commits to main not allowed"
-    exit 1
-fi
-
-if [ $FAILED -eq 1 ]; then
-    echo "❌ Pre-commit checks failed"
-    exit 1
-fi
-
-echo "✅ All checks passed"
-exit 0
+# Check syntax (Python)
+python3 .git/hooks/pre-commit
 ```
 
-#### Python Hook with Ruff
-```python
-#!/usr/bin/env python3
-# .git/hooks/pre-commit
+### Bypass Hooks
+```bash
+# Skip hooks (not recommended)
+git commit --no-verify -m "Emergency fix"
+```
 
-import subprocess
-import sys
+### Get Staged Files
+```bash
+# All staged files
+git diff --cached --name-only --diff-filter=d
 
-def get_staged_files():
-    result = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=d"],
-        capture_output=True, text=True
-    )
-    return [f for f in result.stdout.splitlines() if f.endswith(".py")]
-
-def main():
-    files = get_staged_files()
-    
-    if not files:
-        sys.exit(0)
-    
-    # Format
-    subprocess.run(["ruff", "format"] + files)
-    
-    # Check
-    result = subprocess.run(["ruff", "check"] + files, capture_output=True)
-    
-    if result.returncode != 0:
-        print("❌ Ruff check failed")
-        print(result.stdout.decode())
-        sys.exit(1)
-    
-    # Re-stage
-    subprocess.run(["git", "add"] + files)
-    
-    print("✅ Checks passed")
-    sys.exit(0)
-
-if __name__ == "__main__":
-    main()
+# Python files only
+git diff --cached --name-only --diff-filter=d | grep '\.py$'
 ```
 
 ---
 
-### Useful Hook Patterns
+## Limitations
 
-#### Get Staged Files by Extension
-```bash
-# Python files
-STAGED_PY=$(git diff --cached --name-only --diff-filter=d | grep '\.py$' || true)
+| Problem | Description |
+|---------|-------------|
+| ❌ **Not version controlled** | Each dev must create hooks manually |
+| ❌ **No sharing** | `.git/hooks/` not tracked by Git |
+| ❌ **No updates** | Changes require manual redistribution |
+| ❌ **Easy to bypass** | `--no-verify` skips all hooks |
 
-# JavaScript files
-STAGED_JS=$(git diff --cached --name-only --diff-filter=d | grep '\.js$' || true)
+### When to Use
 
-# All files
-STAGED_ALL=$(git diff --cached --name-only --diff-filter=d)
-```
-
-#### Check Command Success
-```bash
-# Method 1: Using if
-if command; then
-    echo "Success"
-else
-    echo "Failed"
-    exit 1
-fi
-
-# Method 2: Using ||
-command || {
-    echo "Failed"
-    exit 1
-}
-
-# Method 3: Check exit code
-command
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-```
-
-#### Colored Output
-```bash
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-echo -e "${GREEN}✓ Success${NC}"
-echo -e "${RED}✗ Failed${NC}"
-echo -e "${YELLOW}⚠ Warning${NC}"
-```
-
----
-
-### Sharing Hooks with Team
-
-Since hooks in `.git/hooks/` aren't version controlled, you need alternative methods to share them:
-
-#### Method 1: Manual Distribution
-```bash
-# Create hooks directory in repo
-mkdir -p scripts/hooks
-
-# Store hooks there
-cp .git/hooks/pre-commit scripts/hooks/
-
-# Team members copy manually
-cp scripts/hooks/pre-commit .git/hooks/
-chmod +x .git/hooks/pre-commit
-```
-
-#### Method 2: Setup Script
-```bash
-#!/bin/bash
-# setup-hooks.sh
-
-echo "Installing Git hooks..."
-
-cp scripts/hooks/pre-commit .git/hooks/
-chmod +x .git/hooks/pre-commit
-
-cp scripts/hooks/commit-msg .git/hooks/
-chmod +x .git/hooks/commit-msg
-
-echo "✅ Hooks installed"
-```
-
-Team members run:
-```bash
-./setup-hooks.sh
-```
-
-#### Method 3: Git Config (Template)
-```bash
-# Create global hooks directory
-mkdir -p ~/.git-templates/hooks
-
-# Copy hooks there
-cp scripts/hooks/* ~/.git-templates/hooks/
-chmod +x ~/.git-templates/hooks/*
-
-# Configure Git to use template
-git config --global init.templateDir ~/.git-templates
-
-# New clones automatically get hooks
-```
-
----
-
-### Limitations of Local Hooks
-
-| Issue | Description | Impact |
-|-------|-------------|--------|
-| **Not version controlled** | Hooks in `.git/` aren't tracked | Team inconsistency |
-| **Manual setup** | Each developer must install manually | Time-consuming |
-| **No automatic updates** | Changes require redistribution | Outdated hooks |
-| **Easy to bypass** | `--no-verify` flag skips hooks | Not enforceable |
-| **Platform issues** | Bash scripts may fail on Windows | Cross-platform problems |
-
-### When to Use Local Hooks
-
-**Good for:**
+**✅ Good for:**
 - Personal projects
 - Quick prototypes
-- Learning Git hooks
-- Simple, one-off checks
+- Learning hooks
 
-**Not ideal for:**
-- Team projects (use pre-commit framework instead)
-- Complex validation logic
-- Cross-platform teams
-- Hooks that need frequent updates
+**❌ Not for:**
+- Team projects → Use Pre-commit Framework (Part 3)
 
 ---
 
-### Troubleshooting
+## Troubleshooting
 
-#### Hook Not Running
+### Hook Not Running
 ```bash
 # Check if executable
 ls -l .git/hooks/pre-commit
 
-# If not executable:
+# Fix permissions
 chmod +x .git/hooks/pre-commit
 ```
 
-#### Hook Errors
+### Wrong Shebang
 ```bash
-# Test hook manually
-.git/hooks/pre-commit
-
-# Check for syntax errors
-bash -n .git/hooks/pre-commit  # For bash
-python3 .git/hooks/pre-commit  # For python
-```
-
-#### Wrong Shebang
-```bash
-# Wrong - won't work if bash not at /bin/bash
+# ❌ Bad (hardcoded path)
 #!/bin/bash
 
-# Better - finds bash in PATH
+# ✅ Good (finds in PATH)
 #!/usr/bin/env bash
-
-# Same for Python
 #!/usr/bin/env python3
 ```
 
-#### Files Not Detected
+### Files Not Found
 ```bash
-# Debug: See what's staged
+# Debug: show staged files
 git diff --cached --name-only
 
-# Check filter is working
+# Check if any Python files
 git diff --cached --name-only | grep '\.py$'
 ```
 
 ---
 
-**Next**: Part 3 will cover the Pre-commit Framework for better team collaboration and hook management.
+**Next**: Part 3 - Pre-commit Framework (version controlled, team-friendly hooks).
