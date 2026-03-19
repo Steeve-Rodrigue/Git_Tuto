@@ -1,0 +1,11 @@
+{
+    "name" : "api_service",
+    "version" : "1.0.0",
+    "description" : "A simple API service to demonstrate best practices for removing secrets from code",
+    "main" : "index.js",
+    "dependencies": {
+        "express": "^4.17.1",
+        "dotenv": "^10.0.0"
+    }
+
+}
